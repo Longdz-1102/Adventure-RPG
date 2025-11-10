@@ -5,22 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>GAME RPG ⚔️</title>
   <style>
-    body {
-      background: #000;
-      color: white;
-      text-align: center;
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
+ body {
+  background: #000;
+  color: white;
+  text-align: center;
+  font-family: sans-serif;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* canh giữa ngang */
+  justify-content: flex-start;
+  height: 100vh;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  margin: 20px auto; /* canh giữa canvas */
+  border-radius: 20px;
+}
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
+}
     }
-    canvas {
-      background: #222;
-      border-radius: 12px;
-      margin-top: 10px;
-      image-rendering: pixelated;
-      width: 90vw;
-      height: 50vh;
-      max-width: 600px;
+    #menu h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
     }
     #controls {
       position: fixed;
@@ -56,9 +70,13 @@
   </style>
 </head>
 <body>
-  <h1>GAME RPG ⚔️</h1>
+    <!-- MÀN HÌNH MENU -->
+<div id="menu">
+  <h1 class="title">RPG GAME ⚔️</h1>
+  <button id="playBtn">Play Game</button>
+</div>
+  <h1> RPG GAME ⚔️</h1>
   <canvas id="gameCanvas" width="320" height="320"></canvas>
-
   <div id="controls">
     <div class="row">
       <button id="up">⬆️</button>
@@ -569,9 +587,22 @@ function gameLoop() {
 }
 
 // initial draw & start
-draw();
-gameLoop();
+// =================== KHỞI ĐỘNG GAME ===================
+
+// Ẩn canvas và nút điều khiển lúc đầu
+canvas.style.display = "none";
+document.getElementById("controls").style.display = "none";
+
+// Khi người chơi ấn "Play Game"
+document.getElementById("playBtn").onclick = () => {
+  document.getElementById("menu").style.display = "none"; // ẩn menu
+  canvas.style.display = "block"; // hiện canvas game
+  document.getElementById("controls").style.display = "flex"; // hiện nút điều khiển
+  bgm.play(); // bật nhạc nếu có
+  draw();
+  gameLoop(); // bắt đầu game
+};
 
 </script>
 </body>
-</html>
+  </html>
