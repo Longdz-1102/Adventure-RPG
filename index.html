@@ -19,62 +19,71 @@
   overflow: hidden;
 }
 
+/* canvas hiển thị giữa trang */
 canvas {
   display: block;
-  margin: 20px auto; /* canh giữa canvas */
+  margin: 20px auto;
   border-radius: 20px;
 }
 
+/* khu điều khiển */
 #controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 5px;
+  z-index: 10;
   margin-top: 10px;
 }
-    }
-    #menu h1 {
-      font-size: 2em;
-      margin-bottom: 20px;
-    }
-    #controls {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 5px;
-      z-index: 10;
-    }
-    #controls button {
-      width: 60px;
-      height: 60px;
-      font-size: 24px;
-      border-radius: 10px;
-      border: none;
-      background: #333;
-      color: white;
-    }
-    #controls button:active { background: #666; }
-    .row { display:flex; gap:5px; }
-    #attack.cooldown {
-      opacity: 0.5; pointer-events: none; transform: scale(0.9); transition: all 0.3s;
-    }
-    /* nhỏ hiển thị thông báo tạm thời trên màn hình (thay vì alert spam) */
-    #toast {
-      position: fixed; left: 50%; bottom: 200px; transform: translateX(-50%);
-      background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 8px;
-      display: none; z-index: 2000; font-family: sans-serif;
-    }
+
+#controls button {
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
+  border-radius: 10px;
+  border: none;
+  background: #333;
+  color: white;
+}
+
+#controls button:active {
+  background: #666;
+}
+
+.row {
+  display: flex;
+  gap: 5px;
+}
+
+#attack.cooldown {
+  opacity: 0.5;
+  pointer-events: none;
+  transform: scale(0.9);
+  transition: all 0.3s;
+}
+
+/* Thông báo tạm thời */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 200px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: none;
+  z-index: 2000;
+  font-family: sans-serif;
+}
+
   </style>
 </head>
 <body>
-    <!-- MÀN HÌNH MENU -->
-<div id="menu">
-  <h1 class="title">RPG GAME ⚔️</h1>
-  <button id="playBtn">Play Game</button>
-</div>
   <h1> RPG GAME ⚔️</h1>
   <canvas id="gameCanvas" width="320" height="320"></canvas>
   <div id="controls">
@@ -89,6 +98,7 @@ canvas {
     <div class="row">
       <button id="down">⬇️</button>
       <button id="talk">:3</button>
+      <button id="heal">💊</button>
     </div>
   </div>
 
@@ -105,9 +115,15 @@ const bgm = new Audio("RPG song 2.mp3"); // thay bằng file của bạn (option
 bgm.loop = true; bgm.volume = 1;
 window.addEventListener("click", () => { if (bgm.paused) bgm.play(); });
 
-const swordImages = { wood: new Image(), iron: new Image() };
+const swordImages = { 
+  wood: new Image(),
+  iron: new Image(),
+  legendary: new Image() // thêm dòng này
+};
+
 swordImages.wood.src = "wood.sword.png";
 swordImages.iron.src = "iron.sword.png";
+swordImages.legendary.src = "legendary.Sword.png"; // và thêm dòng này
 
 // =================== CORE VARS ===================
 const canvas = document.getElementById("gameCanvas");
@@ -133,24 +149,36 @@ const player = {
   x: 1, y: 1,
   hp: 10, maxHp: 10,
   weapon: "Tay không",
-  inventory: { wood: 0, iron: 0 }
+  inventory: { wood: 0, iron: 0, potion: 0 },
+  damageBonus: 0,   // giá trị cộng thêm khi dùng thuốc
+  buffActive: false // đang có buff không
 };
 
 // =================== MAPS ===================
 const maps = [
   {
     id: 0,
+    color: "orange",
+    obstacles: [],
+    ores: [],
+    enemies: [],
+    npcs: [{x: 4,y: 1 ,image:"npcs.png",message: "Hôm nay anh cảm thấy thế nào :3"
+    }]
+  },
+  {
+    id: 1,
     color: "#7ec850",
     obstacles: [],
+    ores: [],
     enemies: [],
     npcs: [
-      { x:4, y:1, message:"Xin chào :3!" },
+      { x:4, y:1, message:"Nó luôn ở đó không đi đâu cả!" },
       { x:9, y:3, message:"Cẩn thận nhé!" },
       { x:1, y:9, message:"Ta là thợ rèn, muốn rèn gì nào?" }
     ]
   },
   {
-    id: 1,
+    id: 2,
     color: "#00aa00",
     obstacles: [
       {x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},
@@ -160,11 +188,12 @@ const maps = [
       {x:9,y:8},{x:9,y:0},{x:9,y:1},
       {x:9,y:2},{x:9,y:9}
     ],
+    ores: [],
     enemies: [ { x:8, y:8, hp:3, maxHp:3, visible:true, hasDropped:false } ],
     npcs: [ { x:2, y:2, message:"Càng vào sâu, quái càng mạnh!" } ]
   },
   {
-    id: 2,
+    id: 3,
     color: "#3366aa",
     obstacles: [
       {x:9,y:0},{x:9,y:1},{x:9,y:2},{x:9,y:3},{x:9,y:7},
@@ -174,6 +203,7 @@ const maps = [
       {x:3,y:6},{x:3,y:5},{x:3,y:4},{x:0,y:3},{x:0,y:1},
       {x:0,y:7},{x:0,y:8},{x:0,y:0},{x:0,y:2},{x:0,y:9}
     ],
+    ores:[],
     enemies: [
       { x:2, y:2, hp:3, maxHp:3, visible:true, hasDropped:false },
       { x:2, y:8, hp:3, maxHp:3, visible:true, hasDropped:false }
@@ -181,7 +211,7 @@ const maps = [
     npcs: []
   },
   {
-    id: 3,
+    id: 4,
     color: "#8B4513",
     obstacles: [
       {x:0,y:0},{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},
@@ -191,13 +221,34 @@ const maps = [
       {x:8,y:9},{x:7,y:9},{x:6,y:9},{x:0,y:1},{x:0,y:7},{x:0,y:8},
       {x:0,y:9},{x:1,y:9},{x:2,y:9},{x:3,y:9},{x:4,y:9},{x:5,y:9}
     ],
-    enemies: [ { x:4, y:4, hp:100, maxHp:100, isBoss:true, visible:true } ],
+    ores: [],
+    enemies: [ { x:4, y:4, hp:250, maxHp:250, isBoss:true, visible:true}],
     npcs: []
+  },
+  {
+  id: 5,
+  color:"lightgray",
+  obstacles: [],
+  ores: [
+  { x: 5, y: 4, visible: true },
+  { x: 8, y: 6, visible: true },
+  { x: 10, y: 9, visible: true }
+],
+  enemies:[],
+  npcs: []
   }
 ];
 
 let currentMap = 0;
 const mapWidth = 10;
+
+function useItem(item) {
+  if (!item) return;
+  // giữ nếu muốn dùng chung logic, không bắt buộc phải dùng
+  if (item.type === "potion" && item.effect === "damageBoost") {
+    // deprecated — chúng ta sẽ dùng usePotion() trực tiếp
+  }
+}
 
 // =================== UTILS ===================
 function tileBlocked(map, x, y) {
@@ -215,7 +266,7 @@ function randomEmptyTile(map) {
     // not on player, not obstacle, not on NPC
     const occEnemy = map.enemies.some(en => en.visible && en.hp > 0 && en.x === x && en.y === y);
     const occNPC = (map.npcs || []).some(n => n.x === x && n.y === y);
-    if (!tileBlocked(map, x, y) && !(player.x === x && player.y === y) && !occEnemy && !occNPC) return {x,y};
+    if (!tileBlocked(map, x, y) && !(Math.floor(player.x) === x && Math.floor(player.y) === y) && !occEnemy && !occNPC) return {x,y};
   }
   // fallback
   return { x:0, y:0 };
@@ -238,39 +289,44 @@ function draw() {
   ctx.fillStyle = "#555";
   map.obstacles.forEach(o => ctx.fillRect(o.x*tileSize, o.y*tileSize, tileSize-2, tileSize-2));
 
-  // NPCs
-  ctx.fillStyle = "yellow";
-  (map.npcs || []).forEach(n => {
-    ctx.fillRect(n.x*tileSize, n.y*tileSize, tileSize, tileSize);
-  });
-
- // enemies
-(map.enemies || []).forEach(e => {
-  if (!e.visible) return;
-  if (e.hp <= 0) return; // dead (hidden)
-
-  // 👇 thêm scale cho map 3 hoặc boss
-  let scale = 1; // mặc định
-  if (map.id === 3) {
-    scale = e.isBoss ? 2.0 : 1.5; // boss to hơn, quái thường to nhẹ
+// NPCs
+(map.npcs || []).forEach(n => {
+  if (n.image && !n._img) {
+    n._img = new Image();
+    n._img.src = n.image;
   }
 
-  const size = tileSize * scale;
-
-  // vẽ quái to hơn
-  ctx.fillStyle = e.isBoss ? "red" : "red";
-  ctx.fillRect(e.x * tileSize, e.y * tileSize, size, size);
-
-  // thanh máu
-  if (!e.isBoss) {
-    ctx.fillStyle = "black";
-    ctx.fillRect(e.x * tileSize, e.y * tileSize - 6, size, 5);
-    ctx.fillStyle = "lime";
-    ctx.fillRect(e.x * tileSize, e.y * tileSize - 6, size * Math.max(0, e.hp / e.maxHp), 5);
+  if (n._img && n._img.complete) {
+    ctx.drawImage(n._img, n.x * tileSize, n.y * tileSize, tileSize, tileSize);
+  } else {
+    // Nếu ảnh chưa load hoặc không có -> vẽ ô vàng
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(n.x * tileSize, n.y * tileSize, tileSize, tileSize);
   }
 });
+  // enemies
+  (map.enemies || []).forEach(e => {
+    if (!e.visible) return;
+    if (e.hp <= 0) return; // dead (hidden)
 
-  // boss big bar on top-middle
+    let scale = 1;
+    if (map.id === 4) {
+      scale = e.isBoss ? 2.0 : 1.5;
+    }
+    const size = tileSize * scale;
+
+    ctx.fillStyle = e.isBoss ? "darkred" : "red";
+    ctx.fillRect(e.x * tileSize, e.y * tileSize, size, size);
+
+    if (!e.isBoss) {
+      ctx.fillStyle = "black";
+      ctx.fillRect(e.x * tileSize, e.y * tileSize - 6, size, 5);
+      ctx.fillStyle = "lime";
+      ctx.fillRect(e.x * tileSize, e.y * tileSize - 6, size * Math.max(0, e.hp / e.maxHp), 5);
+    }
+  });
+
+  // boss big bar
   const boss = map.enemies.find(e => e.isBoss && e.visible && e.hp > 0);
   if (boss) {
     const barWidth = canvas.width * 0.6;
@@ -289,69 +345,89 @@ function draw() {
     ctx.fillText("BOSS", canvas.width/2, barY + barHeight + 20);
   }
 
-  // player
+  // player (draw at floored tile for tile-based visuals)
   if (playerImgLoaded) {
-    ctx.drawImage(playerImg, player.x*tileSize, player.y*tileSize, tileSize, tileSize);
+    ctx.drawImage(playerImg, Math.floor(player.x)*tileSize, Math.floor(player.y)*tileSize, tileSize, tileSize);
   } else {
-    // fallback rectangle
     ctx.fillStyle = "white";
-    ctx.fillRect(player.x*tileSize+6, player.y*tileSize+6, tileSize-12, tileSize-12);
+    ctx.fillRect(Math.floor(player.x)*tileSize+6, Math.floor(player.y)*tileSize+6, tileSize-12, tileSize-12);
   }
 
-  // weapon image if any
+  // weapon image
   if (player.weapon === "wood" && swordImages.wood.complete) {
-    ctx.drawImage(swordImages.wood, player.x*tileSize + tileSize, player.y*tileSize + 4, 16, 16);
-  } else if (player.weapon === "iron" && swordImages.iron.complete) {
-    ctx.drawImage(swordImages.iron, player.x*tileSize + tileSize, player.y*tileSize + 4, 16, 16);
-  }
+    ctx.drawImage(swordImages.wood, Math.floor(player.x)*tileSize + tileSize, Math.floor(player.y)*tileSize + 4, 16, 16);
+  }else if (player.weapon === "iron" && swordImages.iron.complete) {
+    ctx.drawImage(swordImages.iron, Math.floor(player.x)*tileSize + tileSize, Math.floor(player.y)*tileSize + 4, 16, 16);
+  }else if (player.weapon === "legendarySword" && swordImages.legendary.complete) {
+  ctx.drawImage(
+    swordImages.legendary,
+    Math.floor(player.x) * tileSize + tileSize,
+    Math.floor(player.y) * tileSize + 4,
+    16, 16
+  );
+}
 
   // player hp bar
   const barW = 40, barH = 5;
-  const pBarX = player.x*tileSize + (tileSize/2) - (barW/2);
-  const pBarY = player.y*tileSize - 8;
+  const pBarX = Math.floor(player.x)*tileSize + (tileSize/2) - (barW/2);
+  const pBarY = Math.floor(player.y)*tileSize - 8;
   ctx.fillStyle = "black";
   ctx.fillRect(pBarX-1, pBarY-1, barW+2, barH+2);
   ctx.fillStyle = "lime";
   ctx.fillRect(pBarX, pBarY, barW * Math.max(0, player.hp / player.maxHp), barH);
 
-  // HUD text
+  // HUD
   ctx.fillStyle = "white";
   ctx.font = "14px sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(`Map: ${map.id}`, 10, 15);
   ctx.fillText(`HP: ${player.hp}`, 250, 15);
-  const wName = (player.weapon === "wood") ? "Kiếm Gỗ" : (player.weapon === "iron") ? "Kiếm Sắt" : "Tay không";
-  ctx.fillText(`Vũ khí: ${wName}`, 10, 35);
+  const wName = (player.weapon === "wood")
+  ? "Kiếm Gỗ"
+  : (player.weapon === "iron")
+  ? "Kiếm Sắt"
+  : (player.weapon === "legendarySword")
+  ? "Kiếm Huyền Thoại 🔥"
+  : "Tay không";
+
+ctx.fillText(`Vũ khí: ${wName}`, 10, 35);
 }
 
-// =================== MOVEMENT ===================
+// =================== MOVEMENT (original tile-step behavior kept) ===================
 function updateMap() {
-  // Sang phải qua map kế tiếp
   if (player.x >= mapSize) {
     if (currentMap < maps.length - 1) {
       currentMap++;
-      player.x = 0; // xuất hiện bên trái map mới
+      player.x = 0;
     } else {
-      player.x = mapSize - 1; // map cuối cùng -> đứng lại
+      player.x = mapSize - 1;
     }
-  }
-
-  // Sang trái qua map trước
-  else if (player.x < 0) {
+  } else if (player.x < 0) {
     if (currentMap > 0) {
       currentMap--;
-      player.x = mapSize - 1; // xuất hiện bên phải map trước
+      player.x = mapSize - 1;
     } else {
-      player.x = 0; // map đầu tiên -> đứng lại
+      player.x = 0;
     }
   }
 
-  // Giữ người chơi trong phạm vi map
+  // 🔥 kiểm tra di chuyển lên/xuống giữa map 1 và 5
+  if (maps[currentMap].id === 1 && player.y < 0) {
+    const target = maps.find(m => m.id === 5);
+    currentMap = maps.indexOf(target);
+    player.y = mapSize - 1;
+  } 
+  else if (maps[currentMap].id === 5 && player.y >= mapSize) {
+    const target = maps.find(m => m.id === 1);
+    currentMap = maps.indexOf(target);
+    player.y = 0;
+  }
+
+  // ✅ Giữ nhân vật trong giới hạn map SAU khi đổi map
   player.y = Math.max(0, Math.min(mapSize - 1, player.y));
 
   draw();
 }
-
 function isBlocked(x, y) {
   const map = maps[currentMap];
   return tileBlocked(map, x, y);
@@ -363,15 +439,23 @@ function movePlayer(dx, dy) {
   let nx = player.x + dx;
   let ny = player.y + dy;
 
-  // Nếu đang vượt biên sang trái hoặc phải thì cho phép đổi map luôn
+  // ---- kiểm tra chuyển map theo chiều ngang ----
   if (nx >= mapSize || nx < 0) {
-    player.x = nx; // tạm cập nhật để qua map
-    updateMap();   // chuyển map và reset toạ độ
+    player.x = nx;
+    updateMap();
     draw();
     return;
   }
 
-  // Nếu không vượt biên thì kiểm tra vật cản bình thường
+  // ✅ ---- kiểm tra chuyển map theo chiều dọc ----
+  if (ny >= mapSize || ny < 0) {
+    player.y = ny;
+    updateMap();
+    draw();
+    return;
+  }
+
+  // ---- di chuyển bình thường ----
   if (!isBlocked(nx, ny)) {
     player.x = nx;
     player.y = ny;
@@ -383,6 +467,7 @@ document.getElementById("up").onclick = () => movePlayer(0, -1);
 document.getElementById("down").onclick = () => movePlayer(0, 1);
 document.getElementById("left").onclick = () => movePlayer(-1, 0);
 document.getElementById("right").onclick = () => movePlayer(1, 0);
+document.getElementById("heal").onclick = usePotion;
 
 // =================== ATTACK ===================
 const attackButton = document.getElementById("attack");
@@ -392,16 +477,19 @@ attackButton.onclick = () => {
   let hitSomething = false;
   map.enemies.forEach(e => {
     if (!e.visible || e.hp <= 0) return;
-    const dx = Math.abs(player.x - e.x);
-    const dy = Math.abs(player.y - e.y);
-    // range: close (you used dx<=2 && dy<=1 before) -> keep that
+    const dx = Math.abs(Math.floor(player.x) - e.x);
+    const dy = Math.abs(Math.floor(player.y) - e.y);
     if (dx <= 2 && dy <= 1) {
-      let damage = 1;
-      if (player.weapon === "wood") damage = 2;
-      else if (player.weapon === "iron") damage = 4;
-      e.hp -= damage;
+      // base damage theo vũ khí
+      let baseDamage = 1;
+      if (player.weapon === "wood") baseDamage = 2;
+      else if (player.weapon === "iron") baseDamage = 4;
+      else if (player.weapon === "legendarySword") {
+  baseDamage = 5;}
+
+      const totalDamage = baseDamage + (player.damageBonus || 0);
+      e.hp -= totalDamage;
       hitSomething = true;
-      // on kill
       if (e.hp <= 0) handleEnemyDeath(e, map);
     }
   });
@@ -410,10 +498,21 @@ attackButton.onclick = () => {
     attackButton.classList.add("cooldown");
     setTimeout(() => { canAttack = true; attackButton.classList.remove("cooldown"); }, 1000);
     draw();
-  } else {
-    // no hit feedback (optional)
-    // toast("Không trúng gì!");
   }
+// Đào quặng nếu ở map 5
+if (currentMap === 5) {
+  map.ores.forEach((ore) => {
+    const dx = Math.abs(player.x - ore.x);
+    const dy = Math.abs(player.y - ore.y);
+    if (dx <= 1 && dy <= 1 && ore.visible) {
+      ore.visible = false; // ẩn quặng sau khi đào
+      player.inventory.iron++;
+      toast("⛏️ Bạn đã đào được 1 quặng sắt!", 1000);
+      updateHotbar();
+      hitSomething = true;
+    }
+  });
+}
 };
 
 // =================== NPC & CRAFT ===================
@@ -421,8 +520,8 @@ const talkButton = document.getElementById("talk");
 talkButton.onclick = () => {
   const map = maps[currentMap];
   (map.npcs || []).forEach(n => {
-    const dx = Math.abs(player.x - n.x);
-    const dy = Math.abs(player.y - n.y);
+    const dx = Math.abs(Math.floor(player.x) - n.x);
+    const dy = Math.abs(Math.floor(player.y) - n.y);
     if (dx <= 1 && dy <= 1) interactWithNPC(n);
   });
 };
@@ -439,8 +538,8 @@ function showCraftingMenu() {
   craftingDiv.innerHTML = `
     <h3>Chế tạo vũ khí</h3>
     <p>Bạn có: ${player.inventory.wood} gỗ, ${player.inventory.iron} sắt</p>
-    <button id="craftWoodSword">🪵 Kiếm Gỗ (2 gỗ)</button><br><br>
-    <button id="craftIronSword">⚔️ Kiếm Sắt (2 sắt + 1 gỗ)</button><br><br>
+    <button id="craftWoodSword"> Kiếm Gỗ (2 gỗ)</button><br><br>
+    <button id="craftIronSword"> Kiếm Sắt (2 sắt + 1 gỗ)</button><br><br>
     <button id="closeCraft">❌ Thoát</button>
   `;
   craftingDiv.style.display = "block";
@@ -463,6 +562,7 @@ function craftWeapon(choice) {
       player.weapon = "wood";
       toast("🪵 Bạn đã chế tạo Kiếm Gỗ!", 1200);
       closeCraftingMenu();
+      updateHotbar();
       draw();
     } else alert("Thiếu gỗ để chế tạo!");
   } else if (choice === 2) {
@@ -472,6 +572,7 @@ function craftWeapon(choice) {
       player.weapon = "iron";
       toast("⚔️ Bạn đã chế tạo Kiếm Sắt!", 1200);
       closeCraftingMenu();
+      updateHotbar();
       draw();
     } else alert("Thiếu nguyên liệu để chế tạo!");
   }
@@ -479,38 +580,111 @@ function craftWeapon(choice) {
 
 // =================== ENEMY DEATH / RESPAWN ===================
 function handleEnemyDeath(e, map) {
-  // drop once
   if (!e.hasDropped) {
     e.hasDropped = true;
-    const drop = Math.random();
-    if (drop < 0.5) {
-      player.inventory.wood++;
-      toast("🌲 Nhặt được 1 Gỗ!", 900);
-    } else {
-      player.inventory.iron++;
-      toast("💎 Nhặt được 1 Sắt!", 900);
-    }
+const drop = Math.random();
+if (drop < 0.2) {
+  // 20% rơi thuốc (từ 0.7 đến 0.9)
+  player.inventory.potion++;
+  toast("💊 Nhặt được 1 Bình thuốc!", 1000);
+}
+else if (drop < 0.9) {
+  // 70% rơi gỗ
+  player.inventory.wood++;
+  toast("🌲 Nhặt được 1 Gỗ!", 1000);
+} else if (drop < 1.0) {
+  // 10% không rơi gì
+  toast("💩", 800);
+}
+
+  }
+  if (e.isBoss) {
+  e.visible = false;
+  toast("🔥 Bạn đã hạ BOSS!", 1500);
+
+  // --- 20% cơ hội rơi Kiếm Huyền Thoại ---
+  const dropChance = Math.random();
+  if (dropChance < 0.2) {
+    player.weapon = "legendarySword";
+    toast("⚔️ Bạn nhận được KIẾM HUYỀN THOẠI!", 2000);
   }
 
-  // hide enemy (unless boss - boss may stay but with 0 HP; here we hide non-boss)
-  if (e.isBoss) {
-    e.visible = false; // boss defeated -> hidden
-    // you can choose to not respawn boss
-    toast("Bạn đã hạ BOSS!", 1500);
-  } else {
+  // --- Boss hồi sinh sau 30 giây ---
+  setTimeout(() => {
+    e.hp = e.maxHp;
+    e.visible = true;
+    e.hasDropped = false;
+    e.respawnScheduled = false;
+    const pos = randomEmptyTile(map);
+    e.x = pos.x;
+    e.y = pos.y;
+    toast("💀 BOSS đã hồi sinh!", 1000);
+  }, 30000);
+}
+   else {
     e.visible = false;
     e.respawnScheduled = true;
-    // schedule respawn in 15s
     setTimeout(() => {
       e.hp = e.maxHp;
       e.visible = true;
       e.respawnScheduled = false;
       e.hasDropped = false;
-      // place on random empty tile of current map (or same map)
       const pos = randomEmptyTile(map);
       e.x = pos.x; e.y = pos.y;
-      toast("Quái đã hồi sinh!", 1000);
+      toast("👾 Quái đã hồi sinh!", 1000);
     }, 15000);
+  }
+}
+
+
+// =================== PICKUP ITEMS (bấm vào một ô hoặc đứng lên để nhặt) ===================
+canvas.addEventListener("click", (ev) => {
+  // convert click to tile coords
+  const rect = canvas.getBoundingClientRect();
+  const cx = ev.clientX - rect.left;
+  const cy = ev.clientY - rect.top;
+  const tx = Math.floor(cx / tileSize);
+  const ty = Math.floor(cy / tileSize);
+  // pick up any item at (tx,ty)
+  for (let i = itemsOnMap.length - 1; i >= 0; i--) {
+    const it = itemsOnMap[i];
+    if (it.x === tx && it.y === ty) {
+      if (it.type === "potion") {
+        player.inventory.potion++;
+        toast("💊 + 1 bình thuốc!", 900);
+      }
+      itemsOnMap.splice(i,1);
+      updateHotbar();
+      draw();
+    }
+  }
+});
+
+// =================== USE POTION (buff +5 damage trong 10s) ===================
+function usePotion() {
+  if (player.inventory.potion > 0) {
+    player.inventory.potion--;
+
+    if (!player.buffActive) {
+      player.buffActive = true;
+      player.damageBonus += 5; // +5 damage
+      toast("💥 Sức mạnh tăng +5 trong 10 giây!", 1200);
+
+      setTimeout(() => {
+        player.damageBonus -= 5; // trừ lại
+        player.buffActive = false;
+        toast("⚡ Hiệu lực thuốc đã hết!", 1000);
+        updateHotbar();
+        draw();
+      }, 10000);
+    } else {
+      toast("Thuốc chưa hết tác dụng!", 1000);
+    }
+
+    updateHotbar();
+    draw();
+  } else {
+    toast("Bạn không có thuốc để dùng!");
   }
 }
 
@@ -523,12 +697,10 @@ function enemyAI() {
 
   for (let i = 0; i < map.enemies.length; i++) {
     const e = map.enemies[i];
-
-    // skip if invisible or dead (non-visible)
     if (!e.visible || e.hp <= 0) continue;
 
-    const dx = player.x - e.x;
-    const dy = player.y - e.y;
+    const dx = Math.floor(player.x) - e.x;
+    const dy = Math.floor(player.y) - e.y;
     const distance = Math.abs(dx) + Math.abs(dy);
 
     let moveX = 0, moveY = 0;
@@ -543,21 +715,22 @@ function enemyAI() {
 
     const newX = e.x + moveX;
     const newY = e.y + moveY;
-    // don't walk into obstacles or outside
     if (!tileBlocked(map, newX, newY)) {
-      // also avoid moving into player (so enemy doesn't occupy same tile)
-      if (!(newX === player.x && newY === player.y)) {
+      if (!(newX === Math.floor(player.x) && newY === Math.floor(player.y))) {
         e.x = Math.max(0, Math.min(mapSize-1, newX));
         e.y = Math.max(0, Math.min(mapSize-1, newY));
       }
     }
 
-    // attack if adjacent
-    if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && player.hp > 0) {
-      player.hp -= (currentMap + 1); // more damage on deeper maps
-      if (player.hp < 0) player.hp = 0;
-      
-    }
+    // trong enemyAI()
+  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && player.hp > 0) {
+  let dmg = 1;
+  if (e.isBoss) dmg = 4; // boss đánh 10 máu
+  else if (currentMap === 3) dmg = 2; // map 2 quái đánh 2
+  else if (currentMap === 2) dmg = 1; // map 3 quái đánh 3
+  player.hp -= dmg;
+  if (player.hp < 0) player.hp = 0;
+}
   }
 
   draw();
@@ -585,24 +758,55 @@ function gameLoop() {
   checkGameOver();
   requestAnimationFrame(gameLoop);
 }
+gameLoop()
 
-// initial draw & start
-// =================== KHỞI ĐỘNG GAME ===================
+// Hotbar setup
+const hotbar = document.getElementById("hotbar");
 
-// Ẩn canvas và nút điều khiển lúc đầu
-canvas.style.display = "none";
-document.getElementById("controls").style.display = "none";
-
-// Khi người chơi ấn "Play Game"
-document.getElementById("playBtn").onclick = () => {
-  document.getElementById("menu").style.display = "none"; // ẩn menu
-  canvas.style.display = "block"; // hiện canvas game
-  document.getElementById("controls").style.display = "flex"; // hiện nút điều khiển
-  bgm.play(); // bật nhạc nếu có
-  draw();
-  gameLoop(); // bắt đầu game
+const itemIcons = {
+  wood: "gỗ",
+  iron: "sắt",
+  sword: "⚔️",
+  potion: "🧪"
 };
 
+function updateHotbar() {
+  hotbar.innerHTML = "";
+  const items = player.inventory;
+  const keys = ["wood", "iron", "sword", "potion"]; // chỉ 4 ô
+
+  keys.forEach(key => {
+    const div = document.createElement("div");
+    div.style.cssText = `
+      width: 55px;
+      height: 55px;
+      background: #222;
+      border: 2px solid white;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 22px;
+      cursor: pointer;
+    `;
+    const count = items[key] || 0;
+    div.innerHTML = `
+      ${itemIcons[key] || "❓"}
+      <span style="font-size:14px">${count}</span>
+    `;
+
+    if (key === "potion" && count > 0) {
+      div.onclick = () => usePotion();
+    }
+
+    hotbar.appendChild(div);
+  });
+}
+
+setInterval(updateHotbar, 500);
+updateHotbar();
 </script>
 </body>
   </html>
